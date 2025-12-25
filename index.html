@@ -1,0 +1,190 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+<title>Impostor Craft</title>
+<style>
+*{box-sizing:border-box}
+body{font-family:'Trebuchet MS',Arial,sans-serif;background:repeating-linear-gradient(45deg,#6b8e23,#6b8e23 20px,#556b2f 20px,#556b2f 40px);min-height:100vh;margin:0;padding:10px;display:flex;align-items:center;justify-content:center}
+.screen{background:#c6c6c6;border:5px solid #3a3a3a;border-radius:8px;padding:18px;width:100%;max-width:420px;box-shadow:inset -4px -4px 0 #8b8b8b,inset 4px 4px 0 #fff}
+h1{font-size:1.6rem}
+h2{font-size:1.4rem}
+h3{font-size:1.1rem}
+label{font-weight:bold;margin-top:10px;display:block;font-size:0.95rem}
+input,textarea{width:100%;padding:10px;margin-top:6px;border:3px solid #555;background:#e0e0e0;font-size:1rem}
+button{width:100%;margin-top:12px;padding:14px;font-size:1rem;background:#4CAF50;border:3px solid #2e7d32;color:#fff;font-weight:bold;cursor:pointer;border-radius:6px}
+.secondary{background:#9e9e9e;border-color:#616161}
+.hidden{display:none}
+#timer{font-size:1.5rem;font-weight:bold;text-align:center;margin:10px 0}
+.turn{background:#ddd;padding:10px;border:2px solid #555;margin-bottom:10px;text-align:center;font-weight:bold;border-radius:6px}
+.top-actions{display:flex;gap:8px;flex-wrap:wrap}
+.top-actions button{flex:1}
+.vote-options{display:grid;grid-template-columns:1fr;gap:10px;margin-top:10px}
+.vote-options button{background:#607d8b;border-color:#37474f}
+.vote-table{width:100%;border-collapse:collapse;margin-top:15px;font-size:0.9rem}
+.vote-table th,.vote-table td{border:2px solid #555;padding:6px;text-align:center;font-weight:bold}
+.vote-table th{background:#b0bec5}
+@media (min-width:480px){.vote-options{grid-template-columns:repeat(2,1fr)}}
+</s
+</head>
+<body>
+
+<!-- SETUP -->
+<div class="screen" id="setupScreen">
+<h1>🟩 Impostor Craft</h1>
+<label>Jugadores (uno por línea)</label>
+<textarea id="names" rows="5"></textarea>
+<label>Número de impostores</label>
+<input type="number" id="impostors" min="1" value="1" />
+<label><input type="checkbox" id="randomImpostors" /> Impostores aleatorios (máx 35%)</label>
+<label><input type="checkbox" id="hints" /> Activar pistas</label>
+<label>Tiempo de debate (minutos)</label>
+<input type="number" id="debateMinutes" min="1" value="2" />
+<div class="top-actions">
+<button onclick="startGame()">▶ Iniciar partida</button>
+<button class="secondary" onclick="endGame()">⛔ Finalizar juego</button>
+</div>
+</div>
+
+<!-- ROLES -->
+<div class="screen hidden" id="roleScreen">
+<div class="top-actions"><button class="secondary" onclick="endGame()">⛔ Finalizar juego</button></div>
+<h2 id="playerName"></h2>
+<button onmousedown="reveal(true)" onmouseup="reveal(false)" ontouchstart="reveal(true)" ontouchend="reveal(false)">⛏ Mantén presionado</button>
+<div id="roleArea" class="hidden">
+<h3 id="message"></h3>
+<h3 id="word"></h3>
+<div id="hint"></div>
+</div>
+<button onclick="nextPlayer()">➡ Siguiente jugador</button>
+</div>
+
+<!-- DEBATE -->
+<div class="screen hidden" id="debateScreen">
+<div class="top-actions">
+<button class="secondary" onclick="skipDebate()">⏭ Omitir debate</button>
+<button class="secondary" onclick="endGame()">⛔ Finalizar juego</button>
+</div>
+<h2>🗣️ Debate</h2>
+<div id="turn" class="turn"></div>
+<div id="timer"></div>
+</div>
+
+<!-- VOTACION -->
+<div class="screen hidden" id="voteScreen">
+<div class="top-actions"><button class="secondary" onclick="endGame()">⛔ Finalizar juego</button></div>
+<h2>🗳️ Turno de votar</h2>
+<h3 id="currentVoter"></h3>
+<p style="text-align:center">Selecciona a quién expulsar</p>
+<div class="vote-options" id="voteOptions"></div>
+<table class="vote-table" id="voteTable">
+<thead><tr><th>Jugador</th><th>Votos</th></tr></thead>
+<tbody></tbody>
+</table>
+<button id="finishVoteBtn" class="hidden" onclick="finishVoting()">✅ Finalizar votación</button>
+</div>
+
+<!-- RESULTADO -->
+<div class="screen hidden" id="resultScreen">
+<div class="top-actions"><button class="secondary" onclick="endGame()">⛔ Finalizar juego</button></div>
+<h2>💥 Resultado</h2>
+<div id="result"></div>
+<div id="nextRound" class="hidden">
+<button onclick="startNextRound()">▶ Continuar con otra ronda</button>
+</div>
+<button onclick="restartGame()">🔁 Jugar otra vez</button>
+</div>
+
+<script>
+/* ================= CATÁLOGO (200 palabras aprox.) ================= */
+const peliculas=['Titanic','Avatar','Inception','Matrix','Gladiador','Rocky','Up','Coco','Joker','Batman','Spiderman','Avengers','Interestelar','Toy Story','Shrek','Cars','Frozen','Alien','Depredador','Rambo','Terminator','Star Wars','Harry Potter','El Padrino','Scarface','Creed','Madagascar','Kung Fu Panda','Transformers','Iron Man','Thor','Hulk','Ant-Man','Doctor Strange','Black Panther','Aquaman','Flash','Superman','Wonder Woman','Logan','Deadpool'];
+const objetos=['Silla','Mesa','Celular','Computador','Teclado','Mouse','Cuaderno','Lápiz','Bolígrafo','Botella','Vaso','Plato','Cuchara','Tenedor','Mochila','Zapatos','Camisa','Pantalón','Reloj','Televisor','Control','Audífonos','Parlante','Ventilador','Nevera','Microondas','Licuadora','Cama','Almohada','Cobija','Espejo','Llaves','Candado','Linterna','Martillo','Destornillador','Taladro','Escalera','Bicicleta','Casco'];
+const deportes=['Fútbol','Baloncesto','Tenis','Natación','Ciclismo','Atletismo','Voleibol','Béisbol','Rugby','Golf','Boxeo','Artes Marciales','Surf','Skate','Patinaje','Hockey','Esgrima','Triatlón','Motocross','Automovilismo'];
+const marcas=['Nike','Adidas','Puma','Reebok','Apple','Samsung','Sony','LG','Microsoft','Google','Amazon','Coca-Cola','Pepsi','McDonalds','KFC','Burger King','Toyota','Mazda','Chevrolet','BMW','Audi','Mercedes','Honda','Yamaha','Suzuki','Lenovo','HP','Asus','Dell','Intel'];
+const animales=['Perro','Gato','León','Tigre','Elefante','Jirafa','Cebra','Mono','Gorila','Oso','Lobo','Zorro','Conejo','Caballo','Vaca','Cerdo','Oveja','Cabra','Gallina','Águila','Halcón','Búho','Serpiente','Cocodrilo','Tortuga','Delfín','Ballena','Tiburón','Pulpo','Pingüino'];
+const paises=['Colombia','Argentina','Brasil','Chile','Perú','Ecuador','México','Estados Unidos','Canadá','España','Francia','Italia','Alemania','Portugal','Inglaterra','Japón','China','Corea del Sur','Australia','Nueva Zelanda','India','Rusia','Ucrania','Suecia','Noruega','Finlandia','Dinamarca','Suiza','Bélgica','Países Bajos'];
+const platos=['Bandeja Paisa','Ajiaco','Sancocho','Arepa','Empanada','Tamales','Lechona','Mondongo','Caldo de costilla','Chicharrón','Arroz con coco','Patacón','Cazuela de mariscos','Sobrebarriga','Frijoles','Carne asada','Mote de queso','Changua','Pescado frito','Sudado','Buñuelos','Natilla','Pandebono','Almojábana','Arroz atollado','Posta negra','Hormigas culonas','Mute','Picada','Chorizo','Morcilla','Lulada','Champús','Arepa de huevo','Cuchuco','Carimañola','Encocado','Fritanga','Calentado','Mazorra'];
+
+const words=[...peliculas,...objetos,...deportes,...marcas,...animales,...paises,...platos].map(w=>({text:w,hints:[]}));
+/* ================================================================ */
+
+let game=[],index=0,selectedWord,hintsEnabled=false;
+let debateTime=120,debateInterval;
+let turnOrder=[],turnIndex=0;
+let voteIndex=0,votes={};
+
+function startGame(){
+ const names=document.getElementById('names').value.split('\n').map(n=>n.trim()).filter(n=>n);
+ if(names.length<3) return alert('Mínimo 3 jugadores');
+ let impostors=parseInt(document.getElementById('impostors').value);
+ if(document.getElementById('randomImpostors').checked){impostors=Math.max(1,Math.floor(names.length*0.35));}
+ if(impostors>=names.length) return alert('Demasiados impostores');
+ hintsEnabled=document.getElementById('hints').checked;
+ debateTime=parseInt(document.getElementById('debateMinutes').value)*60;
+ selectedWord=words[Math.floor(Math.random()*words.length)];
+ game=names.map(n=>({name:n,role:'Jugador',alive:true}));
+ let chosen=[];while(chosen.length<impostors){let r=Math.floor(Math.random()*game.length);if(!chosen.includes(r))chosen.push(r)}
+ chosen.forEach(i=>game[i].role='IMPOSTOR');
+ index=0;setupScreen.classList.add('hidden');roleScreen.classList.remove('hidden');show();
+}
+
+function show(){playerName.innerText=game[index].name;roleArea.classList.add('hidden')}
+
+function reveal(s){if(s){roleArea.classList.remove('hidden');const p=game[index];
+ message.innerText=p.role==='IMPOSTOR'?`${p.name}, eres el impostor`:`${p.name}, te tocó`;
+ word.innerText=p.role==='IMPOSTOR'?'???':selectedWord.text;
+ hint.innerText='';
+}else roleArea.classList.add('hidden')}
+
+function nextPlayer(){index++;if(index>=game.length){startDebate();return}show()}
+
+function startDebate(){roleScreen.classList.add('hidden');debateScreen.classList.remove('hidden');
+ turnOrder=game.filter(p=>p.alive).sort(()=>Math.random()-0.5);turnIndex=0;nextTurn();updateTimer();
+ debateInterval=setInterval(()=>{debateTime--;updateTimer();if(debateTime<=0){clearInterval(debateInterval);startVoting()}},1000)}
+
+function skipDebate(){clearInterval(debateInterval);startVoting()}
+
+function nextTurn(){turn.innerText='🎤 Habla: '+turnOrder[turnIndex].name;turnIndex=(turnIndex+1)%turnOrder.length}
+
+function updateTimer(){const m=String(Math.floor(debateTime/60)).padStart(2,'0');const s=String(debateTime%60).padStart(2,'0');timer.innerText=`⏱ ${m}:${s}`}
+
+function startVoting(){debateScreen.classList.add('hidden');voteScreen.classList.remove('hidden');
+ votes={};voteIndex=0;finishVoteBtn.classList.add('hidden');renderVoteTurn();updateVoteTable()}
+
+function renderVoteTurn(){const alive=game.filter(p=>p.alive);
+ if(voteIndex>=alive.length){currentVoter.innerText='Todos han votado';finishVoteBtn.classList.remove('hidden');voteOptions.innerHTML='';return}
+ const voter=alive[voteIndex];currentVoter.innerText=`🎭 Vota: ${voter.name}`;
+ voteOptions.innerHTML='';alive.filter(p=>p.name!==voter.name).forEach(p=>{
+ const b=document.createElement('button');b.innerText=p.name;b.onclick=()=>castVote(voter.name,p.name);voteOptions.appendChild(b)
+ })}
+
+function castVote(voter,target){votes[voter]=target;voteIndex++;updateVoteTable();renderVoteTurn()}
+
+function updateVoteTable(){const tally={};Object.values(votes).forEach(v=>tally[v]=(tally[v]||0)+1);
+ const tbody=document.querySelector('#voteTable tbody');tbody.innerHTML='';game.filter(p=>p.alive).forEach(p=>{
+ const tr=document.createElement('tr');tr.innerHTML=`<td>${p.name}</td><td>${tally[p.name]||0}</td>`;tbody.appendChild(tr)
+ })}
+
+function finishVoting(){const tally={};Object.values(votes).forEach(v=>tally[v]=(tally[v]||0)+1);
+ let eliminated=Object.keys(tally).reduce((a,b)=>tally[a]>tally[b]?a:b);
+ const eliminatedPlayer=game.find(p=>p.name===eliminated);eliminatedPlayer.alive=false;
+ showResult(eliminatedPlayer)}
+
+function showResult(p){voteScreen.classList.add('hidden');resultScreen.classList.remove('hidden');
+ const aliveImpostors=game.filter(x=>x.role==='IMPOSTOR'&&x.alive).length;
+ const alivePlayers=game.filter(x=>x.alive).length;
+ const impostorsList=game.filter(x=>x.role==='IMPOSTOR').map(x=>x.name).join(', ');
+ let html=p.role==='IMPOSTOR'?`🎉 <b>${p.name}</b> era un IMPOSTOR`:`❌ <b>${p.name}</b> era INOCENTE`;
+ if(aliveImpostors===0){html+=`<p>🏆 Todos los impostores fueron eliminados</p><p>🕵️ Impostores: ${impostorsList}</p>`}
+ else if(aliveImpostors>=alivePlayers-aliveImpostors){html+=`<p>💀 Los impostores han ganado</p><p>🕵️ Impostores: ${impostorsList}</p>`}
+ else{html+='<p>⚠️ Aún quedan impostores en el juego</p>';nextRound.classList.remove('hidden')}
+ result.innerHTML=html}
+
+function startNextRound(){resultScreen.classList.add('hidden');debateTime=parseInt(document.getElementById('debateMinutes').value)*60;debateScreen.classList.remove('hidden');startDebate()}
+
+function restartGame(){location.reload()}
+function endGame(){location.reload()}
+</script>
+</body>
+</html>
